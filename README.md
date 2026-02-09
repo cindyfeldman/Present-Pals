@@ -16,10 +16,8 @@ Remember to always create your own local branch.
         
 
 Run the scripts in your terminal to build the index on you local code.
-        - python src/scripts/merge_data.py
-              - This should create a folder called "data" with a "products_clean.json" file in it
-        - python src/scripts/build_index.py
-              - This should create a folder called "index" with 4 files in it
+- python src/scripts/merge_data.py #This should create a folder called "data" with a "products_clean.json" file in it
+- python src/scripts/build_index.py #This should create a folder called "index" with 4 files in it
 These json files for the index are too big, so I cant push them on git, so you have to build it locally instead by running these scripts. 
 
 
