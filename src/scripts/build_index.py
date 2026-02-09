@@ -7,7 +7,7 @@ from nltk.stem import PorterStemmer
 
 # Paths
 SRC_DIR = Path(__file__).resolve().parent.parent  
-DATA_PATH = SRC_DIR / "data" / "processed" / "products_clean.json"
+DATA_PATH = SRC_DIR / "data" / "products_clean.json"
 
 INDEX_DIR = SRC_DIR / "index"
 INDEX_DIR.mkdir(parents=True, exist_ok=True)

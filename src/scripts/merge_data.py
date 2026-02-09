@@ -4,8 +4,8 @@ from html import unescape
 from pathlib import Path
 
 SRC_DIR = Path(__file__).resolve().parent.parent  
-RAW_DIR = SRC_DIR / "data" / "raw"
-OUT_DIR = SRC_DIR / "data" / "processed"
+RAW_DIR = SRC_DIR / "json"
+OUT_DIR = SRC_DIR / "data" 
 
 BESTBUY_PATH = RAW_DIR / "complete_product_list.json"
 TARGET_PATH = RAW_DIR / "target_data_set.json"
