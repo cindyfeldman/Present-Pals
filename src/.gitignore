@@ -4,14 +4,14 @@
 node_modules
 dist
 .cache
-# Raw product data
-src/data/raw/*
-
-# Processed/clean data
-src/data/processed/*
+# Merged and cleaned prooduct data
+src/data/*
 
 # Search index (generated)
 src/index/*
+
+# Raw product data
+src/json/*
 
 # Python cache
 __pycache__/
