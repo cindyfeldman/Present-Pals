@@ -1,0 +1,6 @@
+# Present Pals - dependencies
+#
+# The TF-IDF indexer works without NLTK (falls back to no stemming),
+# but stemming improves search quality.
+nltk>=3.8.1
+

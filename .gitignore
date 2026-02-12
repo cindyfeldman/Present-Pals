@@ -15,7 +15,6 @@ products_clean.json
 index/
 *.jsonl
 *.json
-*.txt
 *.csv
 *.tsv
 *.log
