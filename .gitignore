@@ -11,3 +11,14 @@ __pycache__
 *.pywzz
 *.pyzzz
 *.pywzzz
+products_clean.json
+index/
+*.jsonl
+*.json
+*.txt
+*.csv
+*.tsv
+*.log
+*.log.*
+*.log.*.*
+*.log.*.*.*
