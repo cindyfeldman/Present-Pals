@@ -1,0 +1,5 @@
+src/data/products_clean.json
+src/index/df.json
+src/index/doc_meta.jsonl
+src/index/postings.jsonl
+src/index/stats.json
