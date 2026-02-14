@@ -23,17 +23,19 @@ function App() {
 	setError(null);
 
 	try {
-	  // Constructing the URL with & separators as required by FastAPI
-      // We use URLSearchParams to handle encoding (e.g., spaces to %20) automatically
-      const params = new URLSearchParams({
-        recipient: formData.recipient,
-        min_price: formData.minPrice,
-        max_price: formData.maxPrice,
-        q: formData.query
-	  });
+	  // Build query params (omit empty values so backend gets clean inputs)
+      const params = new URLSearchParams();
+      if (formData.recipient) params.set('recipient', formData.recipient);
+      if (formData.query) params.set('q', formData.query);
+      if (formData.minPrice !== null && formData.minPrice !== '' && !Number.isNaN(Number(formData.minPrice))) {
+        params.set('min_price', String(formData.minPrice));
+      }
+      if (formData.maxPrice !== null && formData.maxPrice !== '' && !Number.isNaN(Number(formData.maxPrice))) {
+        params.set('max_price', String(formData.maxPrice));
+      }
 
-	  //const url = 'http://localhost:8000/search?recipient=${formData.recipient}&min_price=${formData.minPrice}&max_price=${formData.maxPrice}&q=${formData.query}';
-	  const response = await fetch(`http://localhost:8000/search?${params.toString()}`);
+	  // Use Vite dev proxy (avoids CORS + no hardcoded backend URL)
+	  const response = await fetch(`/search?${params.toString()}`);
 
 	  if (!response.ok) throw new Error('Failed to fetch recommendations');
 
