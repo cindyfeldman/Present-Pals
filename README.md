@@ -7,20 +7,20 @@ This repo contains:
 
 ---
 
-## Quickstart (recommended)
+## Quickstart (Demo-safe)
 
-### 1) Install dependencies
+### 1) Install Python dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-Note: `nltk` is optional but improves TF‑IDF stemming. No corpora download needed.
+No extra `nltk` corpora download is needed.
 
-### 1b) Start the backend API (for the React frontend)
+### 2) Start backend API (Terminal A)
 
 ```bash
-uvicorn api_server:app --reload --port 8000
+uvicorn api_server:app --reload --host 127.0.0.1 --port 8000
 ```
 
 Sanity check:
@@ -29,7 +29,7 @@ Sanity check:
 curl http://127.0.0.1:8000/health
 ```
 
-### 2) Build merged dataset + index (local-only)
+### 3) Build merged dataset + index (one-time local setup)
 
 These index files are large, so you generate them locally:
 
@@ -45,13 +45,13 @@ This produces:
 - `src/index/doc_meta.jsonl`
 - `src/index/stats.json`
 
-### 3) Run a query
+### 4) Run a CLI query (optional sanity check)
 
 ```bash
 python src/scripts/query_tfidf.py --recipient mom --min_price 10 --max_price 80 --q "knife set" --k 10
 ```
 
-### 4) Run tests
+### 5) Run tests
 
 ```bash
 python -m unittest discover -s tests -v
@@ -59,17 +59,89 @@ python -m unittest discover -s tests -v
 
 ---
 
-## Frontend (Vite + React)
+## Frontend (Vite + React, Terminal B)
 
 In a second terminal:
 
 ```bash
 cd frontend
+nvm use
 npm install
 npm run dev
 ```
 
 Then open the Vite URL (usually `http://localhost:5173`) and submit the form.
+
+---
+
+## Common demo errors (and fixes)
+
+### 1) `npm ... not to run on Node.js v14`
+
+You are on old Node. Switch to Node 20:
+
+```bash
+cd frontend
+nvm install 20
+nvm use 20
+node -v
+npm -v
+```
+
+Then rerun:
+
+```bash
+npm install
+npm run dev
+```
+
+### 2) Frontend says `Failed to fetch recommendations`
+
+Usually backend is not running, or wrong host/port.
+
+Check backend:
+
+```bash
+curl http://127.0.0.1:8000/health
+```
+
+If it fails, restart backend:
+
+```bash
+uvicorn api_server:app --reload --host 127.0.0.1 --port 8000
+```
+
+### 3) `/search` returns 404 on localhost:8000
+
+Port 8000 may be used by another service (often Docker on IPv6).  
+Use `127.0.0.1` for backend/proxy target (already configured in Vite).
+
+Check listeners:
+
+```bash
+lsof -nP -iTCP:8000 -sTCP:LISTEN
+```
+
+### 4) You changed `vite.config.js` but proxy still behaves old
+
+Vite must be restarted after config changes:
+
+```bash
+# in frontend terminal
+Ctrl+C
+npm run dev
+```
+
+### 5) `git switch main` blocked by local changes
+
+Commit or stash first:
+
+```bash
+git add .
+git commit -m "wip"
+# or: git stash
+git switch main
+```
 
 ## Repo layout
 
