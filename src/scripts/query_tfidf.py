@@ -232,6 +232,134 @@ def main():
         if url:
             print(f"   url: {url}")
         print()
+        
+# Function to be called by FastAPI, returns top-k results as JSON instead of printing
+def get_recommendations(recipient="", min_price=None, max_price=None, q="", k=10):
+    # same logic as main()
+    for p in [POSTINGS_PATH, DF_PATH, DOC_META_PATH, STATS_PATH]:
+        if not p.exists():
+            raise FileNotFoundError(f"Missing {p}. Run: python src/scripts/build_index.py")
+
+    df = json.loads(DF_PATH.read_text(encoding="utf-8"))
+    stats = json.loads(STATS_PATH.read_text(encoding="utf-8"))
+    meta = load_doc_meta(DOC_META_PATH)
+    personas = json.loads(PERSONA_PATH.read_text(encoding="utf-8")) if PERSONA_PATH.exists() else {}
+
+    N = int(stats["N"])
+    recipient = (recipient or "").strip().lower()
+
+    # Weighted query expansion using personas. User query terms are weighted more than persona hints, but both contribute to the final query vector.
+    # Get user query tokens
+    user_query = (q or "").strip()
+    user_tokens = tokenize(user_query)
+
+    # Get persona hint tokens
+    persona_terms = personas.get(recipient, []) if recipient else []
+    persona_tokens = tokenize(" ".join(persona_terms))
+
+    if not user_tokens and not persona_tokens:
+        print("No query tokens. Try: --q \"knife\"")
+        return
+
+    # User intent dominates persona hints
+    ALPHA_CORE = 5.0   # strong
+    BETA_EXP = 0.6     # light
+
+    q_tf = Counter()
+    for t in user_tokens:
+        q_tf[t] += ALPHA_CORE
+    for t in persona_tokens:
+        q_tf[t] += BETA_EXP
+
+    # Build tf-idf query vector
+    q_w = {}
+    q_norm_sq = 0.0
+    for t, tfq in q_tf.items():
+        dft = int(df.get(t, 0))
+        if dft == 0:
+            continue
+        w = tf_weight(float(tfq)) * idf(N, dft)
+        q_w[t] = w
+        q_norm_sq += w * w
+
+    if not q_w:
+        print("No query terms found in vocabulary (after stemming). Try a different query.")
+        return
+
+    q_norm = math.sqrt(q_norm_sq) if q_norm_sq > 0 else 1.0
+    needed_terms = set(q_w.keys())
+    # Load postings for only the terms in this query
+    postings_map = load_postings_for_terms(needed_terms)
+
+    # Retrieval + scoring 
+    dot = defaultdict(float)
+    d_norm_sq = defaultdict(float)
+    matched_terms = defaultdict(list)
+
+    for term, postings in postings_map.items():
+        dft = int(df.get(term, 0))
+        itf = idf(N, dft)
+        wq = q_w[term]
+
+        for doc_id, tf in postings.items():
+            wd = tf_weight(float(tf)) * itf  # TF-IDF weight for doc term
+            dot[doc_id] += wd * wq
+            d_norm_sq[doc_id] += wd * wd
+            if len(matched_terms[doc_id]) < 10:
+                matched_terms[doc_id].append(term)
+
+    # Intent gating: require at least one *core user* term to match
+    # If user didn't type anything (only persona), skip gating.
+    user_term_set = set(user_tokens)
+
+    # Apply boosts and fiters and get final score
+    ranked = []
+    for doc_id, dp in dot.items():
+        m = meta.get(doc_id)
+        if not m:
+            continue
+        
+        # budget filter
+        price = m.get("price")
+        if price is None:
+            continue
+        if not price_ok(float(price), min_price, max_price):
+            continue
+
+        # must match at least one user term
+        if user_term_set:
+            if not (user_term_set & set(matched_terms.get(doc_id, []))):
+                continue
+
+        # Compute cosine similarity
+        dn = math.sqrt(d_norm_sq[doc_id]) if d_norm_sq[doc_id] > 0 else 1.0
+        cosine = dp / (dn * q_norm)
+
+        top_cat = (m.get("category_path") or ["UNKNOWN"])[0]
+        final_score = cosine  
+        ranked.append((final_score, cosine, doc_id))
+
+    ranked.sort(reverse=True, key=lambda x: x[0])
+    topk = ranked[: max(1, k)]
+    
+	# Instead of printing at the end, build a list of results
+    results = []
+    for i, (final_score, cosine, doc_id) in enumerate(topk, start=1):
+        m = meta[doc_id]
+        
+        # Build a clean dictionary for React to read
+        results.append({
+            "id": doc_id,
+            "name": m.get("name", "(no name)"),
+            "price": float(m.get("price", 0.0)),
+            "source": m.get("source", "unknown"),
+            "url": m.get("url", ""),
+            "category": (m.get("category_path") or ["UNKNOWN"])[0],
+            "score": round(float(final_score), 4),
+            "matches": matched_terms.get(doc_id, [])
+        })
+    
+    return results
 
 if __name__ == "__main__":
     main()
