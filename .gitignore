@@ -28,3 +28,4 @@ src/index/doc_meta.jsonl
 src/index/postings.jsonl
 src/index/stats.json
 frontend/README.md
+.nvmrc
