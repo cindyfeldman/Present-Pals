@@ -4,3 +4,7 @@
 # but stemming improves search quality.
 nltk>=3.8.1
 
+# Backend API (for the React frontend)
+fastapi>=0.110.0
+uvicorn[standard]>=0.27.0
+
