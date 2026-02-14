@@ -17,6 +17,18 @@ pip install -r requirements.txt
 
 Note: `nltk` is optional but improves TF‑IDF stemming. No corpora download needed.
 
+### 1b) Start the backend API (for the React frontend)
+
+```bash
+uvicorn api_server:app --reload --port 8000
+```
+
+Sanity check:
+
+```bash
+curl http://127.0.0.1:8000/health
+```
+
 ### 2) Build merged dataset + index (local-only)
 
 These index files are large, so you generate them locally:
@@ -38,6 +50,26 @@ This produces:
 ```bash
 python src/scripts/query_tfidf.py --recipient mom --min_price 10 --max_price 80 --q "knife set" --k 10
 ```
+
+### 4) Run tests
+
+```bash
+python -m unittest discover -s tests -v
+```
+
+---
+
+## Frontend (Vite + React)
+
+In a second terminal:
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Then open the Vite URL (usually `http://localhost:5173`) and submit the form.
 
 ## Repo layout
 
