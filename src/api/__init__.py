@@ -1,0 +1,1 @@
+"""Uses fastapi to create an API that React can easily access."""
