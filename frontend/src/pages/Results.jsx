@@ -7,6 +7,8 @@ export default function Results() {
 	const [results, setResults] = useState([]);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState(null);
+	// Track which gift is currently being looked at
+	const [currIndex, setCurrIndex] = useState(0);
 
 	// Reads URL then performs fetch request
 	useEffect(() => {
@@ -31,43 +33,118 @@ export default function Results() {
 		fetchResults();
 	}, [searchParams]); // Re-run when search params change
 
-	return (
-		// Displays list of results
-		<div style={{ padding: '20px' }}>
-			<Link to="/">← Back to Search</Link>
-			<h2>Search Results</h2>
-			{loading && <p>Searching...</p>}
-			{error && <p style={{ color: 'red' }}>{error}</p>}
+	// Navigation logic
+	const handleNext = () => {
+		if (currIndex < results.length - 1) setCurrIndex(currIndex + 1);
+	}
 
-			{results.length > 0 ? (
+	const handlePrev = () => {
+		if (currIndex > 0) setCurrIndex(currIndex - 1);
+	}
+
+	if (loading) return <div style={{ textAlign: 'center', padding: '50px' }}>Finding the perfect gift...</div>;
+	if (error) return <div style={{ color: 'red', textAlign: 'center' }}>Error: {error}</div>;
+	if (results.length === 0) return <div style={{ textAlign: 'center' }}>No results found. <Link to="/">Try again</Link></div>;
+
+	const currGift = results[currIndex];
+
+	return (
+		// Displays list of results as cards that user can click through
+		<div style={{ 
+			display: 'flex', 
+			flexDirection: 'column', 
+			alignItems: 'center', 
+			justifyContent: 'center',
+			minHeight: '100vh',
+			padding: '20px',
+			backgroundColor: '#f0f2f5'
+		  }}>
+			<Link to="/" style={{ marginBottom: '20px', textDecoration: 'none', color: '#666' }}>← Search Again</Link>
+	  
+			{/* Progress Indicator */}
+			<p style={{ fontWeight: 'bold' }}>Gift {currIndex + 1} of {results.length}</p>
+	  
 			<div style={{ 
-				display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '15px' }}>
-				{results.map((gift, index) => (
-				<div key={index} style={{ border: '1px solid #ddd', padding: '15px', borderRadius: '8px' }}>
-					<h3 style={{ fontSize: '1.1rem', 
-					marginBottom: '8px',
-					display: '-webkit-box',
-					WebkitLineClamp: '2',      // Limit to 2 lines
-					WebkitBoxOrient: 'vertical',
-					overflow: 'hidden',
-					textOverflow: 'ellipsis',
-					minHeight: '2.4em' }}>
-						{gift.name}
-					</h3>
-					<p style={{ fontWeight: 'bold', color: '#28a745' }}>${gift.price.toFixed(2)}</p>
-					<p style={{ fontSize: '0.9rem', color: '#666' }}>Store: {gift.source.toUpperCase()}</p>
-					<div style={{ fontSize: '0.8rem', background: '#e9ecef', padding: '5px', borderRadius: '4px', margin: '10px 0' }}>
-					Matched: {gift.matches.slice(0, 3).join(', ')}
-					</div>
-					<a href={gift.url} target="_blank" rel="noreferrer" style={{ color: '#007bff', textDecoration: 'none', fontWeight: 'bold' }}>
-					View Product →
-					</a>
+			  display: 'flex', 
+			  alignItems: 'center', 
+			  gap: '20px', 
+			  width: '100%', 
+			  maxWidth: '900px' 
+			}}>
+			  {/* Left Button */}
+			  <button 
+				onClick={handlePrev} 
+				disabled={currIndex === 0}
+				style={navButtonStyle}
+			  > 
+				❮ 
+			  </button>
+	  
+			  {/* Page-Wide Card */}
+			  <div style={{ 
+				flex: 1, 
+				background: 'white', 
+				padding: '40px', 
+				borderRadius: '20px', 
+				boxShadow: '0 10px 25px rgba(0,0,0,0.1)',
+				textAlign: 'center'
+			  }}>
+				<h2 style={{ fontSize: '2rem', marginBottom: '10px' }}>{currGift.name}</h2>
+				<p style={{ fontSize: '1.5rem', color: '#28a745', fontWeight: 'bold' }}>
+				  ${currGift.price.toFixed(2)}
+				</p>
+				<p style={{ color: '#666', marginBottom: '20px' }}>Source: {currGift.source.toUpperCase()}</p>
+				
+				<div style={{ background: '#f8f9fa', padding: '15px', borderRadius: '10px', marginBottom: '30px' }}>
+				  <strong>Why it matches:</strong> {currGift.matches.join(', ')}
 				</div>
-				))}
+	  
+				<a 
+				  href={currGift.url} 
+				  target="_blank" 
+				  rel="noreferrer" 
+				  style={buyButtonStyle}
+				>
+				  View Product Website
+				</a>
+			  </div>
+	  
+			  {/* Right Button */}
+			  <button 
+				onClick={handleNext} 
+				disabled={currIndex === results.length - 1}
+				style={navButtonStyle}
+			  > 
+				❯ 
+			  </button>
 			</div>
-			) : (
-			!loading && <p style={{ textAlign: 'center', color: '#888' }}>No results yet. Try a search!</p>
-			)}
 		</div>
 	);
 }
+
+// Simple Styles
+const navButtonStyle = {
+	fontSize: '2rem',
+	background: 'white',
+	border: '1px solid #ddd',
+	borderRadius: '50%',
+	width: '60px',
+	height: '60px',
+	cursor: 'pointer',
+	display: 'flex',
+	alignItems: 'center',
+	justifyContent: 'center',
+	boxShadow: '0 4px 6px rgba(0,0,0,0.05)',
+	opacity: (props) => props.disabled ? 0.3 : 1
+  };
+  
+  const buyButtonStyle = {
+	display: 'inline-block',
+	backgroundColor: '#007bff',
+	color: 'white',
+	padding: '15px 30px',
+	borderRadius: '30px',
+	textDecoration: 'none',
+	fontWeight: 'bold',
+	fontSize: '1.1rem'
+  };

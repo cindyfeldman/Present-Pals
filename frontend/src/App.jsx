@@ -6,6 +6,7 @@ import Results from './pages/Results'
 // import './App.css'
 
 function App() {
+  // Acts as a 'router' to switch between our Home and Results pages
   return (
 	<BrowserRouter>
 	  <Routes>
