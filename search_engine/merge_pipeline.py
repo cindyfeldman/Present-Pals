@@ -106,12 +106,11 @@ def csv_row_to_product(row: Dict[str, Any], source: str) -> Optional[Dict[str, A
     categories = _categories_from_any(category_value)
     category_objs = [{"name": c} for c in categories]
 
-    source_value = str(_pick(row, ["store", "seller_name", "retailer", "merchant", "source"]) or "").strip().lower()
-    resolved_source = source_value or source
-
+    # Use file-level source (e.g. "amazon", "walmart") so all products from this CSV
+    # are labeled consistently, not by row-level seller/store fields.
     pid = _pick(row, ["id", "product_id", "sku", "item_id", "asin", "upc"])
     if pid is None:
-        seed = f"{resolved_source}|{url or name}"
+        seed = f"{source}|{url or name}"
         pid = hashlib.md5(seed.encode("utf-8")).hexdigest()[:12]
 
     if not name or price is None:
@@ -124,7 +123,7 @@ def csv_row_to_product(row: Dict[str, Any], source: str) -> Optional[Dict[str, A
         "price": float(price),
         "description": description,
         "categories": category_objs,
-        "_source_override": resolved_source,
+        "_source_override": source,
     }
 
 
