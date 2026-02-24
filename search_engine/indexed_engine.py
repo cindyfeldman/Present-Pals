@@ -42,6 +42,14 @@ class RepoPaths:
         return self.src / "json" / "target_data_set.json"
 
     @property
+    def raw_amazon(self) -> Path:
+        return self.src / "json" / "amazon-products.csv"
+
+    @property
+    def raw_walmart(self) -> Path:
+        return self.src / "json" / "walmart-products.csv"
+
+    @property
     def merged_products(self) -> Path:
         return self.src / "data" / "products_clean.json"
 
@@ -64,10 +72,16 @@ class IndexedGiftSearch:
     def ensure_merged(self) -> None:
         if self.paths.merged_products.exists():
             return
+        additional = {}
+        if self.paths.raw_amazon.exists():
+            additional["amazon"] = self.paths.raw_amazon
+        if self.paths.raw_walmart.exists():
+            additional["walmart"] = self.paths.raw_walmart
         merge_and_write(
             bestbuy_path=self.paths.raw_bestbuy,
             target_path=self.paths.raw_target,
             out_path=self.paths.merged_products,
+            additional_sources=additional or None,
         )
 
     def ensure_index(
@@ -134,7 +148,13 @@ class IndexedGiftSearch:
                 continue
 
             src = (d.get("source") or "unknown").lower()
-            retailer = Retailer.BEST_BUY if src == "bestbuy" else Retailer.TARGET if src == "target" else Retailer.EBAY
+            retailer = (
+                Retailer.BEST_BUY if src == "bestbuy" else
+                Retailer.TARGET if src == "target" else
+                Retailer.AMAZON if src == "amazon" else
+                Retailer.WALMART if src == "walmart" else
+                Retailer.EBAY
+            )
 
             candidates.append(
                 UnifiedProduct(
