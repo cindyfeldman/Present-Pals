@@ -56,8 +56,35 @@ _meta: Dict[str, Dict[str, Any]] = {}
 _personas: Dict[str, List[str]] = {}
 
 
+def _needs_merge_rebuild(out_path: Path, inputs: List[Path]) -> bool:
+    if not out_path.exists():
+        return True
+    out_mtime = out_path.stat().st_mtime
+    for p in inputs:
+        if p.exists() and p.stat().st_mtime > out_mtime:
+            return True
+    return False
+
+
+def _needs_index_rebuild(idx: TfidfIndex, merged_path: Path) -> bool:
+    if not idx.exists():
+        return True
+    merged_mtime = merged_path.stat().st_mtime
+    index_files = [idx.paths.postings, idx.paths.df, idx.paths.doc_meta, idx.paths.stats]
+    for p in index_files:
+        if not p.exists() or p.stat().st_mtime < merged_mtime:
+            return True
+    return False
+
+
 def _ensure_data_and_index() -> None:
     global _index, _meta, _personas
+
+    additional_sources = {
+        "amazon": RAW_AMAZON,
+        "walmart": RAW_WALMART,
+    }
+    source_paths = [RAW_BESTBUY, RAW_TARGET] + [p for p in additional_sources.values()]
 
     # 1) Merge data if missing
     if not MERGED_PATH.exists():
@@ -72,11 +99,11 @@ def _ensure_data_and_index() -> None:
 
     # 2) Load/build index
     idx = TfidfIndex(IndexPaths(INDEX_DIR))
-    if idx.exists():
-        idx.load()
-    else:
+    if _needs_index_rebuild(idx, MERGED_PATH):
         docs = json.loads(MERGED_PATH.read_text(encoding="utf-8"))
         idx.build_from_docs(docs)
+    else:
+        idx.load()
 
     _index = idx
     _meta = idx.meta

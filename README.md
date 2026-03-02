@@ -1,9 +1,12 @@
 ## Present Pals — Next Generation Gift Search
 
 This repo contains:
-- A **multi-store dataset** (Best Buy + Target JSON + optional EBAY data)
+
+- A **multi-store dataset** (Best Buy + Target JSON + optional Amazon/Walmart CSV + optional live eBay snapshots)
 - A **local TF‑IDF index pipeline** (merge → build index → query) in `src/scripts/`
-- A reusable **Python backend package** in `search_engine/` that builds on that index and adds **persona + occasion-aware reranking (TODO)**
+- A reusable **Python backend package** in `search_engine/` that builds on that index and adds **persona + occasion-aware reranking**
+
+**What the running API uses:** The backend started with `uvicorn api_server:app` uses the merge pipeline (all four sources when files exist), the TF‑IDF index, and **personas** from `src/config/personas.json` for query expansion (e.g. `recipient=mom` adds persona terms to the search). The full **next-gen stack** (TransientPersona, SemanticFilter, RankingEngine) is used by `IndexedGiftSearch` and is covered by `tests/test_indexed_engine_integration.py`; you can use it programmatically or wire it into another API if you want occasion-based reranking and budget/interest filters.
 
 ---
 

@@ -6,7 +6,7 @@ from html import unescape
 from pathlib import Path
 from typing import Any, Optional
 
-SRC_DIR = Path(__file__).resolve().parent.parent  
+SRC_DIR = Path(__file__).resolve().parent.parent
 RAW_DIR = SRC_DIR / "json"
 OUT_DIR = SRC_DIR / "data" 
 LIVE_DIR = OUT_DIR / "live"
@@ -308,6 +308,7 @@ def main():
 
     if merged:
         print("\nSample record:\n", json.dumps(merged[0], indent=2))
+
 
 if __name__ == "__main__":
     main()

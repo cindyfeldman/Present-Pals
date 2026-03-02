@@ -76,6 +76,11 @@ class IndexedGiftSearch:
     def ensure_merged(self) -> None:
         if self.paths.merged_products.exists():
             return
+        additional = {}
+        if self.paths.raw_amazon.exists():
+            additional["amazon"] = self.paths.raw_amazon
+        if self.paths.raw_walmart.exists():
+            additional["walmart"] = self.paths.raw_walmart
         merge_and_write(
             bestbuy_path=self.paths.raw_bestbuy,
             target_path=self.paths.raw_target,
