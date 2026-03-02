@@ -1,7 +1,7 @@
 ## Present Pals — Next Generation Gift Search
 
 This repo contains:
-- A **multi-store dataset** (Best Buy + Target JSON)
+- A **multi-store dataset** (Best Buy + Target JSON + optional EBAY data)
 - A **local TF‑IDF index pipeline** (merge → build index → query) in `src/scripts/`
 - A reusable **Python backend package** in `search_engine/` that builds on that index and adds **persona + occasion-aware reranking (TODO)**
 
@@ -44,6 +44,32 @@ This produces:
 - `src/index/df.json`
 - `src/index/doc_meta.jsonl`
 - `src/index/stats.json`
+
+### 3b) Hybrid mode (optional): add live eBay snapshot
+
+You can keep local BestBuy/Target JSON and append live eBay API results.
+
+1. Copy env template:
+
+```bash
+cp .env.example .env
+```
+
+2. Fill credentials in `.env`:
+- `EBAY_CLIENT_ID`
+- `EBAY_CLIENT_SECRET`
+
+3. Run eBay fetch + merge + index:
+
+```bash
+set -a && source .env && set +a
+python src/scripts/fetch_hybrid_live.py --query "gift ideas" --limit 120
+```
+
+This writes optional live snapshots to:
+- `src/data/live/ebay_products.json`
+
+Then `merge_data.py` automatically includes those snapshots if present.
 
 ### 4) Run a CLI query (optional sanity check)
 

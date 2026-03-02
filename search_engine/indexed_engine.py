@@ -42,8 +42,20 @@ class RepoPaths:
         return self.src / "json" / "target_data_set.json"
 
     @property
+    def raw_amazon_csv(self) -> Path:
+        return self.src / "json" / "amazon-products.csv"
+
+    @property
+    def raw_walmart_csv(self) -> Path:
+        return self.src / "json" / "walmart-products.csv"
+
+    @property
     def merged_products(self) -> Path:
         return self.src / "data" / "products_clean.json"
+
+    @property
+    def ebay_snapshot(self) -> Path:
+        return self.src / "json" / "ebay-products.json"
 
     @property
     def index_dir(self) -> Path:
@@ -68,6 +80,9 @@ class IndexedGiftSearch:
             bestbuy_path=self.paths.raw_bestbuy,
             target_path=self.paths.raw_target,
             out_path=self.paths.merged_products,
+            amazon_csv_path=self.paths.raw_amazon_csv,
+            walmart_csv_path=self.paths.raw_walmart_csv,
+            ebay_snapshot_path=self.paths.ebay_snapshot,
         )
 
     def ensure_index(
@@ -134,7 +149,16 @@ class IndexedGiftSearch:
                 continue
 
             src = (d.get("source") or "unknown").lower()
-            retailer = Retailer.BEST_BUY if src == "bestbuy" else Retailer.TARGET if src == "target" else Retailer.EBAY
+            if src == "bestbuy":
+                retailer = Retailer.BEST_BUY
+            elif src == "target":
+                retailer = Retailer.TARGET
+            elif src == "amazon":
+                retailer = Retailer.AMAZON
+            elif src == "walmart":
+                retailer = Retailer.WALMART
+            else:
+                retailer = Retailer.EBAY
 
             candidates.append(
                 UnifiedProduct(
