@@ -15,7 +15,6 @@ products_clean.json
 index/
 *.jsonl
 *.json
-*.csv
 *.tsv
 *.log
 *.log.*
@@ -29,3 +28,7 @@ src/index/postings.jsonl
 src/index/stats.json
 frontend/README.md
 .nvmrc
+
+# Allow committed snapshots/config used by the team
+!src/json/ebay-products.json
+!src/config/personas.json
