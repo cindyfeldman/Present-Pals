@@ -7,10 +7,11 @@ export default function Home() {
 		recipient: '',
 		minPrice: null,
 		maxPrice: null,
-		interests: [] // Use an array to store multiple interests
+		interests: [], // Use an array to store multiple interests
+		otherInterest: '' // New field for user to input custom interest
 	});
 	const navigate = useNavigate();
-	const categories = ["Video Games", "Cooking", "Gardening", "Tech", "Fitness", "Reading"]; // Predefined categories for user to choose from
+	const categories = ["Video Games", "Cooking", "Gardening", "Tech", "Fitness", "Reading", "Other"]; // Predefined categories for user to choose from
 
 	// Pushes user's choices into the URL as query params
 	const handleSearch = (e) => {
@@ -36,7 +37,11 @@ export default function Home() {
 			? formData.interests.filter((i) => i != interest) // Remove if already selected
 			: [...formData.interests, interest]; // Add if not selected
 
-		setFormData({ ...formData, interests: newInterest });
+		setFormData({ 
+			...formData,
+			interests: newInterest,
+			otherInterest: interest === "Other" && isSelected ? '' : formData.otherInterest // Clear otherInterest if "Other" is deselected
+		});
 	};
 
 	return (
@@ -104,15 +109,15 @@ export default function Home() {
 				</div>
 			  </div>
 	  
-			  <div>
+			<div>
 				<label style={{ display: 'block', fontWeight: 'bold', marginBottom: '10px' }}>
 					What are they interested in?
 				</label>
-				
+				{/* Interest buttons in a responsive grid */}
 				<div style={{
 					display: 'grid',
-					gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
-					gap: '10px'
+					gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))',
+					gap: '8px'
 				}}>
 					{ categories.map((cat) => {
 						const isSelected = formData.interests.includes(cat);
@@ -122,23 +127,41 @@ export default function Home() {
 								type="button"
 								onClick={() => handleSelectInterest(cat)}
 								style={{
-								padding: '10px',
-								borderRadius: '8px',
-								border: '2px solid',
-								borderColor: isSelected ? '#007bff' : '#ccc',
-								backgroundColor: isSelected ? '#e7f3ff' : '#fff',
-								color: isSelected ? '#007bff' : '#333',
-								cursor: 'pointer',
-								fontWeight: isSelected ? 'bold' : 'normal',
-								transition: 'all 0.2s'
+									padding: '8px',
+									borderRadius: '6px',
+									border: isSelected ? '2px solid #007bff' : '1px solid #ccc',
+									backgroundColor: isSelected ? '#e7f3ff' : '#fff',
+									cursor: 'pointer',
+									fontSize: '14px'
 								}}
-							>{cat}</button>
+							>{cat == "Other" && isSelected ? "Other" : cat}
+							</button>
 						);
 					})}
 				</div>
-			  </div>
+				
+				{/* Conditional "Other" Input */}
+				{formData.interests.includes("Other") && (
+					<div style={{ marginTop: '10px', animation: 'fadeIn 0.3s' }}>
+						<input 
+							type="text" 
+							placeholder="Type custom interest..."
+							value={formData.otherInterest}
+							onChange={(e) => setFormData({...formData, otherInterest: e.target.value})}
+							style={{ 
+							width: '100%', 
+							padding: '10px', 
+							borderRadius: '6px',
+							border: '1px solid #ccc',
+							boxSizing: 'border-box'
+						}}
+						autoFocus
+					/>
+				</div>
+			)}
+			</div>
 	  
-			  <button 
+			<button 
 				type="submit" 
 				style={{ 
 				  backgroundColor: '#007bff', color: 'white', padding: '12px', 
