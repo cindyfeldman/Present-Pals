@@ -10,8 +10,13 @@ src/data/*
 # Search index (generated)
 src/index/*
 
-# Raw product data
-src/json/*
+# Raw product data (large generated/source files — not committed)
+# Exception: committed source snapshots (ebay, amazon, walmart CSVs) are tracked explicitly
+json/*.json
+json/*.csv
+!json/amazon-products.csv
+!json/walmart-products.csv
+!json/ebay-products.json
 
 # Python cache
 __pycache__/

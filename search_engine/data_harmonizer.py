@@ -12,6 +12,8 @@ from typing import Any, Dict, List
 class Retailer(Enum):
     BEST_BUY = "BestBuy"
     TARGET = "Target"
+    AMAZON = "Amazon"
+    WALMART = "Walmart"
     EBAY = "eBay"
 
 
