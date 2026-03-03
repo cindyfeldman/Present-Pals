@@ -81,8 +81,8 @@ def _ensure_data_and_index() -> None:
     global _index, _meta, _personas
 
     additional_sources = {
-        "amazon": RAW_AMAZON,
-        "walmart": RAW_WALMART,
+        "amazon": RAW_AMAZON_CSV,
+        "walmart": RAW_WALMART_CSV,
     }
     source_paths = [RAW_BESTBUY, RAW_TARGET] + [p for p in additional_sources.values()]
 

@@ -7,9 +7,10 @@ export default function Home() {
 		recipient: '',
 		minPrice: null,
 		maxPrice: null,
-		query: ''
+		interests: [] // Use an array to store multiple interests
 	});
 	const navigate = useNavigate();
+	const categories = ["Video Games", "Cooking", "Gardening", "Tech", "Fitness", "Reading"]; // Predefined categories for user to choose from
 
 	// Pushes user's choices into the URL as query params
 	const handleSearch = (e) => {
@@ -17,7 +18,7 @@ export default function Home() {
 		// Build query params (omit empty values so backend gets clean inputs)
 		const params = new URLSearchParams();
 		if (formData.recipient) params.set('recipient', formData.recipient);
-		if (formData.query) params.set('q', formData.query);
+		if (formData.interests) params.set('q', formData.interests.join(','));
 		if (formData.minPrice !== null && formData.minPrice !== '' && !Number.isNaN(Number(formData.minPrice))) {
 		params.set('min_price', String(formData.minPrice));
 		}
@@ -29,19 +30,28 @@ export default function Home() {
 		navigate(`/results?${params.toString()}`);
 	};
 
+	const handleSelectInterest = (interest) => {
+		const isSelected = formData.interests.includes(interest);
+		const newInterest = isSelected
+			? formData.interests.filter((i) => i != interest) // Remove if already selected
+			: [...formData.interests, interest]; // Add if not selected
+
+		setFormData({ ...formData, interests: newInterest });
+	};
+
 	return (
 		<div style={{ 
 			display: 'flex',
 			flexDirection: 'column',
 			alignItems: 'center',		// centers horizontally
-			justifyContent: 'center',	// centers vertically
+			//justifyContent: 'center',	// centers vertically
 			minHeight: '100vh',		// sets height to full screen
 			width: '100vw',
 			padding: '20px', 
 			fontFamily: 'system-ui',
 			boxSizing: 'border-box',
 		  }}>
-			<header style={{ textAlign: 'center', marginBottom: '40px' }}>
+			<header style={{ textAlign: 'center', marginBottom: '10px' , marginTop: '5px'}}>
 			  <h1>Personalized Gift Recommender for Every Occasion</h1>
 			</header>
 	  
@@ -95,14 +105,37 @@ export default function Home() {
 			  </div>
 	  
 			  <div>
-				<label style={{ display: 'block', fontWeight: 'bold' }}>What are they interested in?</label>
-				<input 
-				  type="text" 
-				  placeholder="e.g. video games, cooking, gardening"
-				  value={formData.query}
-				  onChange={(e) => setFormData({...formData, query: e.target.value})}
-				  style={{ width: '95%', padding: '10px', marginTop: '5px' }}
-				/>
+				<label style={{ display: 'block', fontWeight: 'bold', marginBottom: '10px' }}>
+					What are they interested in?
+				</label>
+				
+				<div style={{
+					display: 'grid',
+					gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
+					gap: '10px'
+				}}>
+					{ categories.map((cat) => {
+						const isSelected = formData.interests.includes(cat);
+						return (
+							<button
+								key={cat}
+								type="button"
+								onClick={() => handleSelectInterest(cat)}
+								style={{
+								padding: '10px',
+								borderRadius: '8px',
+								border: '2px solid',
+								borderColor: isSelected ? '#007bff' : '#ccc',
+								backgroundColor: isSelected ? '#e7f3ff' : '#fff',
+								color: isSelected ? '#007bff' : '#333',
+								cursor: 'pointer',
+								fontWeight: isSelected ? 'bold' : 'normal',
+								transition: 'all 0.2s'
+								}}
+							>{cat}</button>
+						);
+					})}
+				</div>
 			  </div>
 	  
 			  <button 
