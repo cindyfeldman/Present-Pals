@@ -225,7 +225,7 @@ def search(
         persona_terms=expansion_terms,
         min_price=min_price,
         max_price=max_price,
-        k=max(k, 50),  # retrieve a slightly larger pool before implicit rerank
+        k=max(k*10, 100),  # retrieve a slightly larger pool before implicit rerank
     )
 
     scored: List[tuple[float, Dict[str, Any]]] = []
@@ -242,7 +242,16 @@ def search(
         scored.append((final_score, gift))
 
     scored.sort(key=lambda x: x[0], reverse=True)
-    gifts = [g for _, g in scored[:k]]
+
+    #remove deuplicates by name before triming to k
+    seen_names = set()
+    unique_gifts = []
+    for score, gift in scored:
+        key = gift["name"].lower().strip()
+        if key not in seen_names:
+            seen_names.add(key)
+            unique_gifts.append((score, gift))
+    gifts = [g for _, g in unique_gifts[:k]]
 
     return {
         "gifts": gifts,
@@ -251,4 +260,5 @@ def search(
             "implicit_terms_used": implicit_terms,
         },
     }
+    
 

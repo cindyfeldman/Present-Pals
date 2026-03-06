@@ -96,7 +96,7 @@ export default function Results() {
 				<p style={{ color: '#666', marginBottom: '20px' }}>Source: {currGift.source.toUpperCase()}</p>
 				
 				<div style={{ background: '#f8f9fa', padding: '15px', borderRadius: '10px', marginBottom: '30px' }}>
-				  <strong>Why it matches:</strong> {currGift.matches.join(', ')}
+				  <strong>Tags:</strong> {currGift.matches.join(', ')}
 				</div>
 	  
 				<a 
