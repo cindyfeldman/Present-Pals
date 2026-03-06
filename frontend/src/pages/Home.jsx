@@ -19,7 +19,21 @@ export default function Home() {
 		// Build query params (omit empty values so backend gets clean inputs)
 		const params = new URLSearchParams();
 		if (formData.recipient) params.set('recipient', formData.recipient);
-		if (formData.interests) params.set('q', formData.interests.join(','));
+		
+		// Handle interests, including the "Other" option with custom text
+		let finalInterests = [...formData.interests];
+		if (finalInterests.includes("Other")) {
+			// Remove the word "Other"
+			finalInterests = finalInterests.filter(i => i !== "Other");
+			// Add the custom text if it's not empty
+			if (formData.otherInterest.trim() !== "") {
+				finalInterests.push(formData.otherInterest.trim());
+			}
+		}
+		if (finalInterests.length > 0) {
+			params.set('q', finalInterests.join(','));
+		}
+
 		if (formData.minPrice !== null && formData.minPrice !== '' && !Number.isNaN(Number(formData.minPrice))) {
 		params.set('min_price', String(formData.minPrice));
 		}
@@ -34,10 +48,10 @@ export default function Home() {
 	const handleSelectInterest = (interest) => {
 		const isSelected = formData.interests.includes(interest);
 		const newInterest = isSelected
-			? formData.interests.filter((i) => i != interest) // Remove if already selected
+			? formData.interests.filter((i) => i !== interest) // Remove if already selected
 			: [...formData.interests, interest]; // Add if not selected
 
-		setFormData({ 
+		setFormData({
 			...formData,
 			interests: newInterest,
 			otherInterest: interest === "Other" && isSelected ? '' : formData.otherInterest // Clear otherInterest if "Other" is deselected
