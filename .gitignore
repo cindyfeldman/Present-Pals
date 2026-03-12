@@ -28,6 +28,7 @@ src/index/postings.jsonl
 src/index/stats.json
 frontend/README.md
 .nvmrc
+image_cache/
 
 # Allow committed snapshots/config used by the team
 !src/json/ebay-products.json

@@ -9,6 +9,12 @@ export default function Results() {
 	const [error, setError] = useState(null);
 	// Track which gift is currently being looked at
 	const [currIndex, setCurrIndex] = useState(0);
+	const [imgLoading, setImgLoading] = useState(true);
+
+	// Reset the loader when navigating
+	useEffect(() => {
+		setImgLoading(true);
+	}, [currIndex]);
 
 	// Reads URL then performs fetch request
 	useEffect(() => {
@@ -41,6 +47,8 @@ export default function Results() {
 	const handlePrev = () => {
 		if (currIndex > 0) setCurrIndex(currIndex - 1);
 	}
+
+	// Add this simple effect to reset the loader when navigating
 
 	if (loading) return <div style={{ textAlign: 'center', padding: '50px' }}>Finding the perfect gift...</div>;
 	if (error) return <div style={{ color: 'red', textAlign: 'center' }}>Error: {error}</div>;
@@ -90,6 +98,31 @@ export default function Results() {
 				textAlign: 'center'
 			  }}>
 				<h2 style={{ fontSize: '2rem', marginBottom: '10px' }}>{currGift.name}</h2>
+
+				{/* Image */}
+				<div style={{ 
+					position: 'relative', 
+					height: '300px',
+					display: 'flex',
+					justifyContent: 'center', 
+					alignItems: 'center',
+					}}>
+					{/* Show this while imgLoading is true */}
+					{imgLoading && <div style={{ textAlign: 'center' }}>Loading image...</div>}
+					
+					<img 
+					src={`http://localhost:8000/proxy-image?product_url=${encodeURIComponent(currGift.url)}`}
+					alt={currGift.name}
+					onLoad={() => setImgLoading(false)} 
+					style={{ 
+						display: imgLoading ? 'none' : 'block', 
+						maxWidth: '100%', 
+						maxHeight: '100%' 
+					}}
+					onError={() => setImgLoading(false)} // Stop loading even if it fails
+					/>
+				</div>
+				
 				<p style={{ fontSize: '1.5rem', color: '#28a745', fontWeight: 'bold' }}>
 				  ${currGift.price.toFixed(2)}
 				</p>

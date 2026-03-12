@@ -14,12 +14,16 @@ This server builds on the existing indexing pipeline:
 from __future__ import annotations
 
 import json
+import httpx
+import hashlib
 from datetime import date, timedelta
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+from bs4 import BeautifulSoup
 
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, Query, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 
 from search_engine.merge_pipeline import merge_and_write
 from search_engine.tfidf_index import IndexPaths, TfidfIndex
@@ -37,6 +41,10 @@ MERGED_PATH = SRC_DIR / "data" / "products_clean.json"
 INDEX_DIR = SRC_DIR / "index"
 PERSONAS_PATH = SRC_DIR / "config" / "personas.json"
 EBAY_SNAPSHOT_PATH = SRC_DIR / "json" / "ebay-products.json"
+
+# Define cache directory
+CACHE_DIR = REPO_ROOT / "image_cache"
+CACHE_DIR.mkdir(exist_ok=True)
 
 
 app = FastAPI(title="Present Pals API", version="0.1.0")
@@ -192,6 +200,14 @@ def _implicit_rerank_boost(context_name: str, name: str, matches: List[str]) -> 
         boost += min(0.03, 0.005 * len(mset))
     return min(boost, 0.12)
 
+# Helper to clean up old images
+def cleanup_cache():
+    import time
+    now = time.time()
+    for f in CACHE_DIR.iterdir():
+        if f.stat().st_mtime < now - (3 * 86400): # 3 days
+            f.unlink()
+
 
 @app.get("/health")
 def health() -> Dict[str, Any]:
@@ -251,4 +267,64 @@ def search(
             "implicit_terms_used": implicit_terms,
         },
     }
+
+@app.get("/proxy-image")
+async def proxy_image(product_url: str, background_tasks: BackgroundTasks):
+    # Create a unique filename based on the product URL
+    url_hash = hashlib.md5(product_url.encode()).hexdigest()
+    cache_path = CACHE_DIR / f"{url_hash}.jpg"
+
+    # Return cached version if it exists
+    if cache_path.exists():
+        return FileResponse(cache_path)
+
+    # If not cached, scrape the image URL from the page
+    async with httpx.AsyncClient(follow_redirects=True) as client:
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.9",
+            "Accept-Encoding": "gzip, deflate, br",
+            "Connection": "keep-alive",
+            "Upgrade-Insecure-Requests": "1",
+            "Referer": "https://www.google.com/" # Pretend we came from a search engine
+        }
+        
+        async with httpx.AsyncClient(follow_redirects=True, timeout=10.0) as client:
+            try:
+                response = await client.get(product_url, headers=headers)
+                soup = BeautifulSoup(response.text, 'html.parser')
+                
+                actual_img_url = None
+                
+                # 1. Try Structured Data (Most reliable for Amazon/Walmart)
+                json_ld = soup.find("script", type="application/ld+json")
+                if json_ld:
+                    try:
+                        data = json.loads(json_ld.string)
+                        # Amazon often puts this in a list or a single object
+                        if isinstance(data, list): data = data[0]
+                        actual_img_url = data.get("image")
+                    except:
+                        pass
+                    
+                # 2. Try Open Graph (Fallback for some sites)
+                if not actual_img_url:
+                    img_tag = soup.find("meta", property="og:image")
+                if img_tag:
+                    actual_img_url = img_tag["content"]
+                    
+                if not actual_img_url:
+                    return {"error": "Request Blocked or image not found"}
+
+                image_response = await client.get(actual_img_url, headers=headers)
+                
+                with open(cache_path, "wb") as f:
+                    f.write(image_response.content)
+            
+                background_tasks.add_task(cleanup_cache)
+                return FileResponse(cache_path)
+            
+            except Exception as e:
+                return {"error": str(e)}
 
