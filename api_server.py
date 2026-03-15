@@ -14,12 +14,14 @@ This server builds on the existing indexing pipeline:
 from __future__ import annotations
 
 import json
-import httpx
+from curl_cffi.requests import AsyncSession
 import hashlib
 from datetime import date, timedelta
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 from bs4 import BeautifulSoup
+import re
+from urllib.parse import urljoin
 
 from fastapi import FastAPI, Query, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
@@ -270,61 +272,100 @@ def search(
 
 @app.get("/proxy-image")
 async def proxy_image(product_url: str, background_tasks: BackgroundTasks):
-    # Create a unique filename based on the product URL
+    # CLEAN THE URL
+    # Converts long URLs to: https://www.amazon.com/dp/ASIN
+    asin_match = re.search(r"/[dg]p/([^/?]+)", product_url)
+    if asin_match:
+        product_url = f"https://www.amazon.com/dp/{asin_match.group(1)}"
+
     url_hash = hashlib.md5(product_url.encode()).hexdigest()
     cache_path = CACHE_DIR / f"{url_hash}.jpg"
 
-    # Return cached version if it exists
     if cache_path.exists():
         return FileResponse(cache_path)
 
-    # If not cached, scrape the image URL from the page
-    async with httpx.AsyncClient(follow_redirects=True) as client:
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
-            "Accept-Language": "en-US,en;q=0.9",
-            "Accept-Encoding": "gzip, deflate, br",
-            "Connection": "keep-alive",
-            "Upgrade-Insecure-Requests": "1",
-            "Referer": "https://www.google.com/" # Pretend we came from a search engine
-        }
-        
-        async with httpx.AsyncClient(follow_redirects=True, timeout=10.0) as client:
-            try:
-                response = await client.get(product_url, headers=headers)
-                soup = BeautifulSoup(response.text, 'html.parser')
-                
-                actual_img_url = None
-                
-                # 1. Try Structured Data (Most reliable for Amazon/Walmart)
-                json_ld = soup.find("script", type="application/ld+json")
-                if json_ld:
-                    try:
-                        data = json.loads(json_ld.string)
-                        # Amazon often puts this in a list or a single object
-                        if isinstance(data, list): data = data[0]
-                        actual_img_url = data.get("image")
-                    except:
-                        pass
-                    
-                # 2. Try Open Graph (Fallback for some sites)
-                if not actual_img_url:
-                    img_tag = soup.find("meta", property="og:image")
-                if img_tag:
-                    actual_img_url = img_tag["content"]
-                    
-                if not actual_img_url:
-                    return {"error": "Request Blocked or image not found"}
+    # MODERN HEADERS (Matches a real Windows Chrome 122 user)
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Accept-Encoding": "gzip, deflate, br",
+        "Referer": "https://www.google.com/",
+        "Sec-Ch-Ua": '"Chromium";v="122", "Not(A:Brand";v="24", "Google Chrome";v="122"',
+        "Sec-Ch-Ua-Mobile": "?0",
+        "Sec-Ch-Ua-Platform": '"Windows"',
+        "Sec-Fetch-Dest": "document",
+        "Sec-Fetch-Mode": "navigate",
+        "Sec-Fetch-Site": "cross-site",
+        "Upgrade-Insecure-Requests": "1",
+    }
 
-                image_response = await client.get(actual_img_url, headers=headers)
-                
-                with open(cache_path, "wb") as f:
-                    f.write(image_response.content)
+    async with AsyncSession(impersonate="chrome") as session:
+        try:
+            # FETCH THE PAGE
+            resp = await session.get(product_url, headers=headers, timeout=15)
             
-                background_tasks.add_task(cleanup_cache)
-                return FileResponse(cache_path)
+            # Check for that "Continue Shopping" block
+            if "captcha" in resp.text.lower() or "continue shopping" in resp.text.lower():
+                return {"error": "Amazon blocked with a CAPTCHA. Your IP might be temporarily flagged."}
+
+            soup = BeautifulSoup(resp.text, 'html.parser')
+            actual_img_url = None
+
+            # Strategy A: JSON-LD (Standard SEO)
+            json_script = soup.find("script", type="application/ld+json")
+            if json_script:
+                try:
+                    data = json.loads(json_script.string)
+                    if isinstance(data, list): data = data[0]
+                    actual_img_url = data.get("image")
+                except: pass
+
+            # Strategy B: The "Landing Image" ID (Most common for desktop layouts)
+            if not actual_img_url:
+                img_tag = soup.find("img", id="landingImage") or soup.find("img", id="main-image")
+                if img_tag:
+                    # Amazon stores the high-res map in 'data-a-dynamic-image'
+                    dynamic_img = img_tag.get("data-a-dynamic-image")
+                    if dynamic_img:
+                        # It's a dictionary like {"URL": [width, height]}. We want the first key.
+                        try:
+                            urls = json.loads(dynamic_img)
+                            actual_img_url = list(urls.keys())[0]
+                        except: pass
+                    else:
+                        actual_img_url = img_tag.get("src")
+
+            # Strategy C: The "ImageBlock" Regex (Fallback for mobile/special layouts)
+            if not actual_img_url:
+                # Look for 'hiRes' or 'large' in the page source
+                match = re.search(r'"hiRes":"(https://.*?\.jpg)"', resp.text) or \
+                        re.search(r'"large":"(https://.*?\.jpg)"', resp.text)
+                if match:
+                    actual_img_url = match.group(1)
+
+            # Strategy D: OpenGraph (Last resort)
+            if not actual_img_url:
+                meta = soup.find("meta", property="og:image")
+                if meta:
+                    actual_img_url = meta.get("content")
+
+            # CLEAN IMAGE URL (Get the high-res version, not the thumbnail)
+            actual_img_url = urljoin(product_url, actual_img_url)
+            # Removes strings like ._AC_SY400_. from the filename
+            actual_img_url = re.sub(r'\._AC_.*?\.', '.', actual_img_url)
+
+            # DOWNLOAD THE IMAGE
+            img_data = await session.get(actual_img_url, headers=headers)
             
-            except Exception as e:
-                return {"error": str(e)}
+            if "image" not in img_data.headers.get("Content-Type", "").lower():
+                 return {"error": "Target URL is not a valid image."}
+
+            with open(cache_path, "wb") as f:
+                f.write(img_data.content)
+            
+            return FileResponse(cache_path)
+
+        except Exception as e:
+            return {"error": str(e)}
 
