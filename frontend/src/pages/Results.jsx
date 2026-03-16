@@ -67,7 +67,7 @@ export default function Results() {
 			padding: '20px',
 			backgroundColor: '#f0f2f5'
 		  }}>
-			<Link to="/" style={{ marginBottom: '20px', textDecoration: 'none', color: '#666' }}>← Search Again</Link>
+			<Link to="/search" style={{ marginBottom: '20px', textDecoration: 'none', color: '#666' }}>← Search Again</Link>
 	  
 			{/* Progress Indicator */}
 			<p style={{ fontWeight: 'bold' }}>Gift {currIndex + 1} of {results.length}</p>

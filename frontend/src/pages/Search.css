@@ -1,0 +1,12 @@
+.search-container {
+	border: 20px solid #E3242B; /* Red Border */
+
+	height: 100vh;
+	width: 100vw;
+	box-sizing: border-box;
+
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	background-color: #C89D7C;
+}
