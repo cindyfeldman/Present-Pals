@@ -7,6 +7,8 @@ nltk>=3.8.1
 # Backend API (for the React frontend)
 fastapi>=0.110.0
 uvicorn[standard]>=0.27.0
+curl_cffi>=0.7.0
+beautifulsoup4>=4.13.0
 
 # API ingestion (eBay / Walmart hybrid fetch scripts)
 requests>=2.32.0

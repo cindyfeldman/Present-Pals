@@ -14,13 +14,19 @@ This server builds on the existing indexing pipeline:
 from __future__ import annotations
 
 import json
+from curl_cffi.requests import AsyncSession
+import hashlib
 import math
 from datetime import date, timedelta
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+from bs4 import BeautifulSoup
+import re
+from urllib.parse import urljoin
 
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, Query, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 
 from search_engine.merge_pipeline import merge_and_write
 from search_engine.tfidf_index import IndexPaths, TfidfIndex
@@ -38,6 +44,10 @@ MERGED_PATH = SRC_DIR / "data" / "products_clean.json"
 INDEX_DIR = SRC_DIR / "index"
 PERSONAS_PATH = SRC_DIR / "config" / "personas.json"
 EBAY_SNAPSHOT_PATH = SRC_DIR / "json" / "ebay-products.json"
+
+# Define cache directory
+CACHE_DIR = REPO_ROOT / "image_cache"
+CACHE_DIR.mkdir(exist_ok=True)
 
 
 app = FastAPI(title="Present Pals API", version="0.1.0")
@@ -193,6 +203,14 @@ def _implicit_rerank_boost(context_name: str, name: str, matches: List[str]) -> 
         boost += min(0.03, 0.005 * len(mset))
     return min(boost, 0.12)
 
+# Helper to clean up old images
+def cleanup_cache():
+    import time
+    now = time.time()
+    for f in CACHE_DIR.iterdir():
+        if f.stat().st_mtime < now - (3 * 86400): # 3 days
+            f.unlink()
+
 
 @app.get("/health")
 def health() -> Dict[str, Any]:
@@ -271,4 +289,173 @@ def search(
             "implicit_terms_used": implicit_terms,
         },
     }
+
+# Helper function to get images from Amazon
+async def get_amazon_image(soup, html_text):
+    
+    match = re.search(r'"hiRes":"(https://.*?\.jpg)"', html_text)
+    if match: return match.group(1)
+    img = soup.find("img", id="landingImage")
+    return img.get("src") if img else None
+
+# Helper function to get images from Best Buy
+async def get_bestbuy_image(soup, html_text):
+    img = soup.find("img", class_="primary-image")
+    if img: return img.get("src")
+    link = soup.find("link", rel="image_src")
+    return link.get("href") if link else None
+
+# Helper function to get images from Walmart
+async def get_walmart_image(soup, html_text):
+    # Standard Meta Tag
+    meta = soup.find("meta", property="og:image")
+    if meta and meta.get("content"):
+        return meta.get("content")
+
+    # JSON-LD (Search for the "Image" type)
+    json_ld = soup.find("script", type="application/ld+json")
+    if json_ld:
+        try:
+            data = json.loads(json_ld.string)
+            if isinstance(data, list): data = data[0]
+            img = data.get("image")
+            if isinstance(img, list): return img[0]
+            if img: return img
+        except:
+            pass
+
+    # The "__NEXT_DATA__" (Walmart also uses Next.js)
+    next_data = soup.find("script", id="__NEXT_DATA__")
+    if next_data:
+        try:
+            data = json.loads(next_data.string)
+            # Deep path for Walmart's image assets
+            img = data.get("props", {}).get("pageProps", {}).get("initialData", {}).get("data", {}).get("product", {}).get("imageAssets", [{}])[0].get("url")
+            if img: return img
+        except:
+            pass
+            
+    return None
+
+# Helper function to get images from Target
+async def get_target_image(soup, html_text):
+    # Parse the __NEXT_DATA__ JSON blob
+    target_data = soup.find("script", id="__NEXT_DATA__")
+    if target_data:
+        try:
+            data = json.loads(target_data.string)
+            # This path is deep, so we use .get() safely
+            product = data.get("props", {}).get("pageProps", {}).get("product", {})
+            img_url = product.get("item", {}).get("enrichment", {}).get("images", {}).get("primary_image_url")
+            if img_url:
+                return img_url
+        except:
+            pass
+    
+    # Fallback: OpenGraph (Target sometimes populates this for social sharing)
+    meta = soup.find("meta", property="og:image")
+    return meta.get("content") if meta else None
+
+@app.get("/proxy-image")
+async def proxy_image(product_url: str, background_tasks: BackgroundTasks):
+    try: 
+        # Hash the URL to create a unique cache filename
+        url_hash = hashlib.md5(product_url.encode()).hexdigest()
+        cache_path = CACHE_DIR / f"{url_hash}.jpg"
+
+        if cache_path.exists():
+            return FileResponse(cache_path)
+		
+        headers = {
+            # 1. The Identity: Claims we are a standard Windows 10 Chrome user
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+        
+            # 2. The Content: Tells the server what file types we can handle
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.9",
+            "Accept-Encoding": "gzip, deflate, br",
+        
+            # 3. Client Hints: CRITICAL for Chrome impersonation
+            "Sec-Ch-Ua": '"Chromium";v="122", "Not(A:Brand";v="24", "Google Chrome";v="122"',
+            "Sec-Ch-Ua-Mobile": "?0",
+            "Sec-Ch-Ua-Platform": '"Windows"',
+        
+            # 4. Fetch Metadata: Tells the server how we navigated to the page
+            "Sec-Fetch-Dest": "document",
+            "Sec-Fetch-Mode": "navigate",
+            "Sec-Fetch-Site": "none",
+            "Sec-Fetch-User": "?1",
+        
+            # 5. Behavior: Standard browser "upkeep" headers
+            "Upgrade-Insecure-Requests": "1",
+            "Connection": "keep-alive",
+            "Cache-Control": "max-age=0",
+        }
+
+		# Determine settings based on domain
+        domain = ""
+        if "amazon.com" in product_url: domain = "amazon"
+        elif "bestbuy.com" in product_url: domain = "bestbuy"
+        elif "target.com" in product_url: domain = "target"
+        elif "walmart.com" in product_url: domain = "walmart"
+
+		# Best Buy and Target often prefer HTTP/1.1 to avoid stream resets
+        use_http2 = False if domain in ["bestbuy", "target"] else True
+		
+        async with AsyncSession(impersonate="chrome") as session:
+            current_headers = headers.copy()
+			#Add a Referer specific to the store
+            if domain:
+                current_headers["Referer"] = f"https://www.{domain}.com/"
+				
+            resp = await session.get(product_url, headers=current_headers, timeout=15)
+			
+			# Check if we got a valid page back
+            if resp.status_code != 200:
+                return {"error": f"Site returned status {resp.status_code}"}
+			
+            soup = BeautifulSoup(resp.text, 'html.parser')
+            actual_img_url = None
+			
+			# Dispatch to the correct helper
+            if domain == "amazon":
+                actual_img_url = await get_amazon_image(soup, resp.text)
+            elif domain == "bestbuy":
+                actual_img_url = await get_bestbuy_image(soup, resp.text)
+            elif domain == "target":
+                actual_img_url = await get_target_image(soup, resp.text)
+            elif domain == "walmart":
+                actual_img_url = await get_walmart_image(soup, resp.text)
+            else:
+				# Generic fallback for eBay or others
+                meta = soup.find("meta", property="og:image")
+                actual_img_url = meta.get("content") if meta else None
+				
+
+            if not actual_img_url:
+                return {"error": f"Could not extract image URL from {domain or 'site'}"}
+
+			# CLEAN IMAGE URL 
+            if actual_img_url:
+                actual_img_url = urljoin(product_url, actual_img_url)
+                if "amazon.com" in product_url: # Only run Amazon-specific cleaning on Amazon links
+                    actual_img_url = re.sub(r'\._AC_.*?\.', '.', actual_img_url)
+
+			# DOWNLOAD THE IMAGE
+            img_response = await session.get(actual_img_url, headers=headers)
+				
+            if img_response.status_code != 200:
+                return {"error": "Failed to fetch image file"}
+
+            if "image" not in img_response.headers.get("Content-Type", "").lower():
+                return {"error": "URL did not point to a valid image"}
+
+            with open(cache_path, "wb") as f:
+                f.write(img_response.content)
+				
+            return FileResponse(cache_path)
+    
+    except Exception as e:
+        # This catches any other weird errors and returns them as JSON instead of a 500
+        return {"error": "Internal Server Error", "details": str(e)}
 
