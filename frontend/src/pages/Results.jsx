@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useSearchParams, Link } from 'react-router-dom'
+import bgImage from '../assets/background.jpg'
 
 export default function Results() {
 	// State for API response and loading status
@@ -65,12 +66,16 @@ export default function Results() {
 			justifyContent: 'center',
 			minHeight: '100vh',
 			padding: '20px',
-			backgroundColor: '#f0f2f5'
+			backgroundImage: `url(${bgImage})`,
+			backgroundSize: 'cover',
+			backgroundPosition: 'center',
+			backgroundRepeat: 'no-repeat',
+			backgroundAttachment: 'fixed'
 		  }}>
-			<Link to="/search" style={{ marginBottom: '20px', textDecoration: 'none', color: '#666' }}>← Search Again</Link>
+			<Link to="/search" style={{ marginBottom: '20px', textDecoration: 'none', color: '#fff' }}>← Search Again</Link>
 	  
 			{/* Progress Indicator */}
-			<p style={{ fontWeight: 'bold' }}>Gift {currIndex + 1} of {results.length}</p>
+			<p style={{ fontWeight: 'bold', color: '#fff' }}>Gift {currIndex + 1} of {results.length}</p>
 	  
 			<div style={{ 
 			  display: 'flex', 
@@ -173,7 +178,7 @@ const navButtonStyle = {
   
   const buyButtonStyle = {
 	display: 'inline-block',
-	backgroundColor: '#007bff',
+	backgroundColor: '#e3242b',
 	color: 'white',
 	padding: '15px 30px',
 	borderRadius: '30px',

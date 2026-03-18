@@ -12,7 +12,8 @@ export default function Search() {
 		otherInterest: '' // New field for user to input custom interest
 	});
 	const navigate = useNavigate();
-	const categories = ["Video Games", "Cooking", "Gardening", "Tech", "Fitness", "Reading", "Other"]; // Predefined categories for user to choose from
+	const categories = ["Video Games", "Cooking", "Gardening", "Tech", "Fitness", "Reading", "Arts", "Sports", 
+						"Music", "Photography", "Puzzles", "Other"]; // Predefined categories for user to choose from
 
 	// Pushes user's choices into the URL as query params
 	const handleSearch = (e) => {
@@ -71,7 +72,7 @@ export default function Search() {
         	flexDirection: 'column',
         	alignItems: 'center',
         	justifyContent: 'center',
-        	backgroundColor: '#c89d7c',    // Ensures the inside is white
+        	backgroundColor: '#bb854e',
         	overflowX: 'hidden'
 		}}>
 			<div style={{ 
