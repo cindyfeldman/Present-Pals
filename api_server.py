@@ -16,6 +16,7 @@ from __future__ import annotations
 import json
 from curl_cffi.requests import AsyncSession
 import hashlib
+import math
 from datetime import date, timedelta
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -238,12 +239,16 @@ def search(
     implicit_context, implicit_terms = _implicit_context_terms(date.today())
     expansion_terms = persona_terms + implicit_terms
 
+    # Retrieve a large pool so all sources (including eBay) are represented.
+    # Without this, equal-scoring docs fill the pool alphabetically (amazon < ebay)
+    # and eBay products are never seen.
+    pool_size = max(k * 20, 200)
     results = _index.query(
         user_query=q,
         persona_terms=expansion_terms,
         min_price=min_price,
         max_price=max_price,
-        k=max(k, 50),  # retrieve a slightly larger pool before implicit rerank
+        k=pool_size,
     )
 
     scored: List[tuple[float, Dict[str, Any]]] = []
@@ -260,7 +265,22 @@ def search(
         scored.append((final_score, gift))
 
     scored.sort(key=lambda x: x[0], reverse=True)
-    gifts = [g for _, g in scored[:k]]
+
+    # Source diversity: cap each source at ceil(k * 0.4) slots to prevent any
+    # single source from monopolising results when scores are tied.
+    max_per_source = max(1, math.ceil(k * 0.4))
+    source_counts: Dict[str, int] = {}
+    primary: List[Dict[str, Any]] = []
+    overflow: List[Dict[str, Any]] = []
+    for score, gift in scored:
+        src = gift["source"]
+        if source_counts.get(src, 0) < max_per_source:
+            primary.append(gift)
+            source_counts[src] = source_counts.get(src, 0) + 1
+        else:
+            overflow.append(gift)
+
+    gifts = (primary + overflow)[:k]
 
     return {
         "gifts": gifts,

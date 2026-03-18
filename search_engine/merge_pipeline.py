@@ -8,6 +8,7 @@ so tests and the search engine can call it directly with custom paths.
 from __future__ import annotations
 
 import csv
+import hashlib
 import json
 import re
 import sys
@@ -248,7 +249,15 @@ def parse_price(raw: Any) -> Optional[float]:
     try:
         return float(s)
     except Exception:
-        return None
+        pass
+    # Fallback: extract first number (handles "USD 42", "EUR 10.99", etc.)
+    match = PRICE_RE.search(s)
+    if match:
+        try:
+            return float(match.group(0))
+        except ValueError:
+            pass
+    return None
 
 
 def parse_json_list(raw: Any) -> List[str]:
@@ -368,6 +377,7 @@ def merge_and_write(
     amazon_csv_path: Optional[Path] = None,
     walmart_csv_path: Optional[Path] = None,
     ebay_snapshot_path: Optional[Path] = None,
+    additional_sources: Optional[Dict[str, Path]] = None,
 ) -> List[Dict[str, Any]]:
     bestbuy_raw = load_json_array(bestbuy_path)
     target_raw = load_json_array(target_path)
@@ -382,6 +392,18 @@ def merge_and_write(
     if ebay_snapshot_path and ebay_snapshot_path.exists():
         ebay_raw = load_json_array(ebay_snapshot_path)
         merged.extend(normalize_live_products(ebay_raw, "ebay"))
+
+    if additional_sources:
+        for source_name, csv_path in additional_sources.items():
+            if csv_path and csv_path.exists():
+                products = [
+                    p for p in (
+                        csv_row_to_product(r, source_name)
+                        for r in load_csv_rows(csv_path)
+                    )
+                    if p is not None
+                ]
+                merged.extend(normalize_products(products, source_name))
 
     # Deduplicate by doc_id
     unique: Dict[str, Dict[str, Any]] = {}

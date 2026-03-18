@@ -6,6 +6,7 @@ export default function Results() {
 	// State for API response and loading status
 	const [searchParams] = useSearchParams();
 	const [results, setResults] = useState([]);
+	const [seasonalContext, setSeasonalContext] = useState(null);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState(null);
 	// Track which gift is currently being looked at
@@ -17,6 +18,14 @@ export default function Results() {
 		setImgLoading(true);
 	}, [currIndex]);
 
+	const SEASON_STYLES = {
+		christmas:      { emoji: '🎄', color: '#e65100', bg: 'linear-gradient(135deg, #fff8e1, #ffe0b2)', border: '#ffcc80' },
+		valentines:     { emoji: '❤️',  color: '#c62828', bg: 'linear-gradient(135deg, #fce4ec, #f8bbd0)', border: '#f48fb1' },
+		mothers_day:    { emoji: '💐', color: '#6a1b9a', bg: 'linear-gradient(135deg, #f3e5f5, #e1bee7)', border: '#ce93d8' },
+		fathers_day:    { emoji: '👔', color: '#1565c0', bg: 'linear-gradient(135deg, #e3f2fd, #bbdefb)', border: '#90caf9' },
+		halloween:      { emoji: '🎃', color: '#e65100', bg: 'linear-gradient(135deg, #fff3e0, #ffe0b2)', border: '#ffb74d' },
+		back_to_school: { emoji: '🎒', color: '#2e7d32', bg: 'linear-gradient(135deg, #e8f5e9, #c8e6c9)', border: '#a5d6a7' },
+	};
 	// Reads URL then performs fetch request
 	useEffect(() => {
 		const fetchResults = async () => {
@@ -31,6 +40,7 @@ export default function Results() {
 
 				// We access the 'gifts' key we defined in our FastAPI return statement
 				setResults(data.gifts || []);
+				setSeasonalContext(data.meta, null)
 			} catch (error) {
 				setError("Error connecting to backend: " + error.message);
 			} finally {
@@ -135,8 +145,34 @@ export default function Results() {
 				
 				<div style={{ background: '#f8f9fa', padding: '15px', borderRadius: '10px', marginBottom: '30px' }}>
 				  <strong>Why it matches:</strong> {currGift.matches.join(', ')}
+				  {seasonalContext && seasonalContext.implicit_context !== "none" && (() => {
+					const s = SEASON_STYLES[seasonalContext.implicit_context] || SEASON_STYLES.christmas;
+					return (
+						<div style={{
+							background: s.bg,
+							border: `1px solid ${s.border}`,
+							borderRadius: '8px',
+							padding: '8px 14px',
+							display: 'flex',
+							alignItems: 'center',
+							gap: '8px',
+							fontSize: '0.85rem',
+							color: s.color,
+							width: '50%',
+							boxSizing: 'border-box',
+							margin: '0 auto 16px auto'
+						}}>
+							<span style={{ fontSize: '1.1rem' }}>{s.emoji}</span>
+							<span>
+								Trending for <strong>{seasonalContext.implicit_context.replace(/_/g, ' ')}</strong>
+								<br />
+								<em style={{ fontSize: '0.78rem' }}> {seasonalContext.implicit_terms_used.join(', ')}</em>
+							</span>
+						</div>
+					);
+				})()}
 				</div>
-	  
+	
 				<a 
 				  href={currGift.url} 
 				  target="_blank" 
